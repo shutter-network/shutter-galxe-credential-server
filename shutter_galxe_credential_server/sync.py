@@ -24,13 +24,15 @@ def get_address(name):
 
 
 w3 = Web3()  # uses provider from env var WEB3_PROVIDER_URI
-inbox = w3.eth.contract(address=get_address("INBOX_ADDRESS"), abi=abis.inbox)
+sequencer = w3.eth.contract(
+    address=get_address("SEQUENCER_ADDRESS"), abi=abis.sequencer
+)
 
 
 event_processors = [
     (
-        inbox.events.EncryptedTransactionSubmitted,
-        credentials.process_encrypted_transaction_submitted_event,
+        sequencer.events.TransactionSubmitted,
+        credentials.process_transaction_submitted_event,
     )
 ]
 

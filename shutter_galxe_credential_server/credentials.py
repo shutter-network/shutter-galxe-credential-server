@@ -6,14 +6,14 @@ logger = logging.getLogger(__name__)
 
 
 class Credential(enum.StrEnum):
-    SHOP_ENCRYPTED_TX_SENT = "shop_encrypted_tx_sent"
+    GNOSH_TRANSACTION_SUBMITTED = "gnosh_transaction_submitted"
 
 
-def process_encrypted_transaction_submitted_event(conn, event):
+def process_transaction_submitted_event(conn, event):
     sender = event.args.sender
     logger.info(
-        f"rewarding SHOP_ENCRYPTED_TX_SENT credential to sender {sender} "
+        f"rewarding GNOSH_TRANSACTION_SUBMITTED credential to sender {sender} "
         f"for tx {event.transactionHash.hex()} "
         f"in block {event.blockNumber}"
     )
-    db.award_credential(conn, sender, Credential.SHOP_ENCRYPTED_TX_SENT)
+    db.award_credential(conn, sender, Credential.GNOSH_TRANSACTION_SUBMITTED)
