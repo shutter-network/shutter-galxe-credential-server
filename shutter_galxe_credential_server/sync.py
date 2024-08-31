@@ -3,11 +3,15 @@ import eth_utils
 import os
 from web3 import Web3
 import time
+import datetime
 
 from shutter_galxe_credential_server import abis, db, credentials
 
+ERPC_ADDRESS = os.getenv("ERPC_ADDRESS")
+
 MAX_SYNC_BLOCK_RANGE = 1000
 BLOCK_POLL_INTERVAL = 1
+LAST_ERPC_SYNC = 0
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +77,7 @@ def sync_events_once():
             events = fetch_events(event, fetch_from_block, fetch_to_block)
             with db.connect() as conn:
                 for ev in events:
-                    process(conn, ev)
+                    process(conn, ev, ERPC_ADDRESS)
                 db.set_sync_status(
                     conn, event.address, event.event_name, genesis_hash, fetch_to_block
                 )
@@ -98,3 +102,34 @@ def fetch_events(event, from_block, to_block):
         toBlock=to_block,
     )
     return events
+
+def sync_erpc():
+    logger.debug("starting erpc db sync")
+    with db.connect() as conn:
+        global LAST_ERPC_SYNC
+        LAST_ERPC_SYNC = db.get_erpc_sync_status(conn)
+    while True:
+        try:
+            sync_erpc_db_once()
+        except Exception:
+            logger.exception("error during ERPC sync")
+        time.sleep(BLOCK_POLL_INTERVAL)
+
+
+
+def sync_erpc_db_once():
+    with db.connect() as conn:
+        global LAST_ERPC_SYNC
+        if LAST_ERPC_SYNC == None:
+            LAST_ERPC_SYNC = 0
+            logger.debug(f"fetching erpc updates from start")
+        else:
+            logger.debug(f"fetching erpc updates after {datetime.datetime.fromtimestamp(LAST_ERPC_SYNC)}")
+        newUpdates = db.get_erpc_updates(conn, LAST_ERPC_SYNC)
+        if len(newUpdates) > 0:
+            logger.debug(f"found {len(newUpdates)} new updates from erpc | updating credentials")
+            credentials.process_new_erpc_updates(conn, newUpdates)
+            last_submission_time = max(row[1] for row in newUpdates)
+            LAST_ERPC_SYNC = last_submission_time
+            db.update_erpc_sync_status(conn, last_submission_time)
+
