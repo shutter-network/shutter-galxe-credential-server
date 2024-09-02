@@ -129,7 +129,7 @@ def sync_erpc_db_once():
         if len(newUpdates) > 0:
             logger.debug(f"found {len(newUpdates)} new updates from erpc | updating credentials")
             credentials.process_new_erpc_updates(conn, newUpdates)
-            last_submission_time = max(row[1] for row in newUpdates)
-            LAST_ERPC_SYNC = last_submission_time
-            db.update_erpc_sync_status(conn, last_submission_time)
+            tx_hashes = [rows[1] for rows in newUpdates]
+            LAST_ERPC_SYNC = db.get_max_submission_time(conn, tx_hashes)
+            db.update_erpc_sync_status(conn, LAST_ERPC_SYNC)
 
