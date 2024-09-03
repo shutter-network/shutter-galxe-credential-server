@@ -2,8 +2,7 @@ name: shutter-galxe_server
 services:
   postgres:
     image: postgres:14-alpine
-    ports:
-      - "5433:5432"
+    restart: always
     environment:
       POSTGRES_DB: "postgres"
       POSTGRES_USER: "postgres"
@@ -22,6 +21,7 @@ services:
 
   setup-postgres:
     image: postgres:14-alpine
+    restart: always
     entrypoint: ["psql", "-f", "/migration.sql"]
     environment:
       PGHOST: "postgres"
@@ -33,3 +33,34 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    restart: always
+    environment:
+      WEB3_PROVIDER_URI:
+      SEQUENCER_ADDRESS:
+    volumes:
+      - ${DATA_DIR:-.}/data/app:/data
+    depends_on:
+      setup-postgres:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    labels:
+      caddy: "${APP_DOMAIN}"
+      caddy.reverse_proxy: "{{upstreams 5000}}"
+
+  caddy:
+    image: lucaslorentz/caddy-docker-proxy:latest
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ${DATA_DIR:-.}/data/caddy:/data
+    labels:
+      caddy.email: "devops@brainbot.com"

@@ -1,4 +1,4 @@
-FROM python:3.12.2-alpine3.19 as base
+FROM python:3.12.2-alpine3.19 AS base
 
 ENV PYTHONFAULTHANDLER=1 \
     PYTHONHASHSEED=random \
@@ -6,7 +6,7 @@ ENV PYTHONFAULTHANDLER=1 \
 
 WORKDIR /app
 
-FROM base as builder
+FROM base AS builder
 
 ENV PIP_DEFAULT_TIMEOUT=100 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
@@ -23,9 +23,9 @@ RUN poetry export -f requirements.txt | /venv/bin/pip install -r /dev/stdin
 COPY . .
 RUN poetry build && /venv/bin/pip install dist/*.whl
 
-FROM base as final
+FROM base AS final
 
 RUN apk add --no-cache libffi libpq
 COPY --from=builder /venv /venv
-COPY docker-entrypoint.sh ./
+COPY docker/docker-entrypoint.sh ./
 CMD ["./docker-entrypoint.sh"]
