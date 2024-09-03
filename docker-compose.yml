@@ -1,0 +1,35 @@
+name: shutter-galxe_server
+services:
+  postgres:
+    image: postgres:14-alpine
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: "postgres"
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+    volumes:
+      - ./db-data:/var/lib/postgresql/data
+
+  setup-postgres:
+    image: postgres:14-alpine
+    entrypoint: ["psql", "-f", "/migration.sql"]
+    environment:
+      PGHOST: "postgres"
+      PGDATABASE: "postgres"
+      PGUSER: "postgres"
+      PGPASSWORD: "postgres"
+    volumes:
+      - ./migration.sql:/migration.sql:ro
+    depends_on:
+      postgres:
+        condition: service_healthy

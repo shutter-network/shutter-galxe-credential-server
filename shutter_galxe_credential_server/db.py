@@ -1,6 +1,7 @@
 import os
 import logging
-import sqlite3
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 PATH = os.getenv("DB_PATH")
 
@@ -10,8 +11,7 @@ logger = logging.getLogger(__name__)
 def connect():
     if PATH is None:
         raise ValueError("DB_PATH environment variable is not set")
-    conn = sqlite3.connect(PATH, autocommit=False)
-    conn.row_factory = sqlite3.Row
+    conn = conn = psycopg2.connect(PATH)
     return conn
 
 
@@ -40,6 +40,14 @@ def create():
             )
         """
         )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS erpc_sync (
+                last_submission_time INTEGER NOT NULL,
+                PRIMARY KEY (last_submission_time)
+            )
+        """
+        )
         conn.commit()
     finally:
         conn.close()
@@ -48,8 +56,8 @@ def create():
 def has_credential(conn, address, credential):
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT 1 FROM credentials WHERE credential = :credential AND address = :address",
-        {"credential": credential, "address": address},
+        "SELECT 1 FROM credentials WHERE credential = %s AND address = %s",
+        (credential, address),
     )
     row = cursor.fetchone()
     return row is not None
@@ -59,16 +67,27 @@ def award_credential(conn, address, credential):
     cursor = conn.cursor()
     cursor.execute(
         """
-        INSERT INTO credentials (credential, address) VALUES (:credential, :address)
+        INSERT INTO credentials (credential, address) VALUES (%s, %s)
         ON CONFLICT(credential, address) DO NOTHING
         """,
-        {"credential": credential, "address": address},
+        (credential, address),
     )
     conn.commit()
 
+def award_credential_multiple(conn, data):
+    with conn.cursor() as cursor:
+        cursor.executemany(
+            """
+            INSERT INTO credentials (credential, address) VALUES (%s, %s)
+            ON CONFLICT(credential, address) DO NOTHING
+            """,
+            data
+        )
+        conn.commit()
+
 
 def get_sync_status(conn):
-    cursor = conn.cursor()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
     cursor.execute("SELECT address, event, genesis_hash, block_number FROM sync_status")
     rows = cursor.fetchall()
     return {
@@ -82,14 +101,29 @@ def set_sync_status(conn, address, event, genesis_hash, block_number):
     cursor.execute(
         """
         INSERT INTO sync_status (address, event, genesis_hash, block_number)
-        VALUES (:address, :event, :genesis_hash, :block_number)
+        VALUES (%s, %s, %s, %s)
         ON CONFLICT(address, event) DO UPDATE SET
-        genesis_hash = :genesis_hash, block_number = :block_number
+        genesis_hash = %s, block_number = %s
     """,
-        {
-            "address": address,
-            "event": event,
-            "genesis_hash": genesis_hash,
-            "block_number": block_number,
-        },
+        (
+            address, event, genesis_hash, block_number, genesis_hash, block_number
+        )
     )
+
+def get_erpc_updates(conn, last_sync_timestamp):
+
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT address, submission_time FROM transaction_details WHERE inclusion_time > 0 AND is_cancellation = false AND submission_time > %s", (last_sync_timestamp,))
+    rows = cursor.fetchall()
+    return rows
+
+def get_erpc_sync_status(conn):
+    cursor = conn.cursor()
+    cursor.execute("SELECT MAX(last_submission_time) AS max_submission_time FROM erpc_sync")
+    rows = cursor.fetchone()
+    return rows[0]
+
+def update_erpc_sync_status(conn, last_update):
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO erpc_sync (last_submission_time) VALUES (%s) ON CONFLICT(last_submission_time) DO NOTHING", (last_update,))
+    conn.commit()

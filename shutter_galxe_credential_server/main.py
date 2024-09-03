@@ -18,6 +18,9 @@ def create_app():
     sync_thread = threading.Thread(target=sync.sync_events, daemon=True)
     sync_thread.start()
 
+    erpc_thread = threading.Thread(target=sync.sync_erpc, daemon=True)
+    erpc_thread.start()
+    
     app = Flask(__name__)
     app.register_blueprint(server)
     CORS(app, origins=ACCESS_CONTROL_ALLOW_ORIGINS)

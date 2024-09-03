@@ -2,7 +2,7 @@
 name = "shutter-galxe-credential-server"
 version = "0.1.0"
 description = ""
-authors = ["Jannik Luhn <jannik@brainbot.com>"]
+authors = ["Jannik Luhn <jannik@brainbot.com>", "Punit Jain <punit@brainbot.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
@@ -12,6 +12,7 @@ flask-cors = "^4.0.0"
 gunicorn = "^21.2.0"
 web3 = "^6.15.1"
 eth_utils = "^4.0.0"
+psycopg2 = "^2.9.9"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.2.0"
