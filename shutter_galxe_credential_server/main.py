@@ -6,7 +6,7 @@ from shutter_galxe_credential_server.server import server
 from shutter_galxe_credential_server import db, sync
 import threading
 
-ACCESS_CONTROL_ALLOW_ORIGINS = ["https://galxe.com"]
+ACCESS_CONTROL_ALLOW_ORIGINS = ["https://galxe.com", "https://dashboard.galxe.com"]
 
 logger = logging.getLogger(__name__)
 
