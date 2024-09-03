@@ -25,6 +25,7 @@ def create():
             CREATE TABLE IF NOT EXISTS credentials (
                 credential TEXT,
                 address TEXT,
+                counter BIGINT,
                 PRIMARY KEY (credential, address)
             )
         """
@@ -67,8 +68,10 @@ def award_credential(conn, address, credential):
     cursor = conn.cursor()
     cursor.execute(
         """
-        INSERT INTO credentials (credential, address) VALUES (%s, %s)
-        ON CONFLICT(credential, address) DO NOTHING
+        INSERT INTO credentials (credential, address, counter)
+        VALUES (%s, %s, 1)
+        ON CONFLICT (credential, address)
+        DO UPDATE SET counter = credentials.counter + 1;
         """,
         (credential, address),
     )
@@ -78,8 +81,10 @@ def award_credential_multiple(conn, data):
     with conn.cursor() as cursor:
         cursor.executemany(
             """
-            INSERT INTO credentials (credential, address) VALUES (%s, %s)
-            ON CONFLICT(credential, address) DO NOTHING
+            INSERT INTO credentials (credential, address, counter)
+            VALUES (%s, %s, 1)
+            ON CONFLICT (credential, address)
+            DO UPDATE SET counter = credentials.counter + 1;
             """,
             data
         )
@@ -111,11 +116,16 @@ def set_sync_status(conn, address, event, genesis_hash, block_number):
     )
 
 def get_erpc_updates(conn, last_sync_timestamp):
-
     cursor = conn.cursor()
-    cursor.execute("SELECT DISTINCT address, submission_time FROM transaction_details WHERE inclusion_time > 0 AND is_cancellation = false AND submission_time > %s", (last_sync_timestamp,))
+    cursor.execute("SELECT DISTINCT address, tx_hash FROM transaction_details WHERE inclusion_time > 0 AND is_cancellation = false AND submission_time > %s", (last_sync_timestamp,))
     rows = cursor.fetchall()
     return rows
+
+def get_max_submission_time(conn, tx_hashes):
+    cursor = conn.cursor()
+    cursor.execute("SELECT MAX(submission_time) as last_submission_time FROM transaction_details WHERE tx_hash IN %s", (tuple(tx_hashes),))
+    rows = cursor.fetchone()
+    return rows[0]
 
 def get_erpc_sync_status(conn):
     cursor = conn.cursor()
